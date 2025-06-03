@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, Modal } from "react-native";
-import { collection, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { db } from "../config/firebaseConfig";
 
 const RequestsScreen = () => {
@@ -40,10 +39,9 @@ const RequestsScreen = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleFinalizar = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "requests", id));
-      fetchRequests();
+      await updateRequestStatus(id, "finalizado");
     } catch (error) {
       Alert.alert("Error", "No se pudo finalizar la solicitud.");
     }
@@ -53,7 +51,7 @@ const RequestsScreen = () => {
     updateRequestStatus(id, "en camino");
     setTimeout(() => {
       setEnSitioEnabled((prev) => ({ ...prev, [id]: true }));
-    }, 60000);
+    }, 60000); // 1 minuto
   };
 
   const openIncompleteModal = (id: string) => {
@@ -116,7 +114,7 @@ const RequestsScreen = () => {
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.buttonSuccess}
-              onPress={() => handleDelete(item.id)}
+              onPress={() => handleFinalizar(item.id)}
             >
               <Text style={styles.buttonText}>Finalizar</Text>
             </TouchableOpacity>

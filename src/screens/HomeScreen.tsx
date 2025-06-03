@@ -3110,7 +3110,7 @@ const styles = StyleSheet.create({
 
 export default HomeScreen;*/
 
-import React, { useState, useEffect } from "react";
+/*import React, { useState, useEffect } from "react";
 import {
   View, Text, Button, TextInput, FlatList, Modal, Alert,
   StyleSheet, TouchableOpacity
@@ -3143,14 +3143,17 @@ const HomeScreen = ({ navigation }: any) => {
       const auth = getAuth();
       const user = auth.currentUser;
       if (!user) return;
-
+  
       const querySnapshot = await getDocs(collection(db, "requests"));
       const fetchedRequests = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-
-      const filtered = isWorkingMode ? fetchedRequests : fetchedRequests.filter(req => req.userId === user.uid);
-
+  
+      const filtered = isWorkingMode
+        ? fetchedRequests.filter(req => req.userId !== user.uid)
+        : fetchedRequests.filter(req => req.userId === user.uid);
+  
       setRequests(filtered);
+  
       const states: { [key: string]: string } = {};
       filtered.forEach(req => {
         states[req.id] = req.status;
@@ -3388,7 +3391,7 @@ const HomeScreen = ({ navigation }: any) => {
         />
       )}
 
-      {/* MODAL DE CREACIÓN/EDICIÓN */}
+      {/* MODAL DE CREACIÓN/EDICIÓN *//*}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -3404,7 +3407,7 @@ const HomeScreen = ({ navigation }: any) => {
         </View>
       </Modal>
 
-      {/* MENU MODAL */}
+      {/* MENU MODAL *//*}
       <Modal visible={menuVisible} transparent animationType="fade">
         <TouchableOpacity style={styles.menuOverlay} onPress={() => setMenuVisible(false)}>
           <View style={styles.menuContainer}>
@@ -3444,6 +3447,538 @@ const styles = StyleSheet.create({
   },
   menuOverlay: { flex: 1, justifyContent: "flex-start", alignItems: "flex-end", paddingTop: 90, paddingRight: 20, backgroundColor: "rgba(0,0,0,0.3)" },
   menuContainer: { width: 200, backgroundColor: "#fff", borderRadius: 10, padding: 10, elevation: 10 },
+});
+
+export default HomeScreen;*/
+
+import React, { useState, useEffect } from "react";
+import {
+  View, Text, Button, TextInput, FlatList, Modal, Alert,
+  StyleSheet, TouchableOpacity
+} from "react-native";
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { db } from "../config/firebaseConfig";
+import { getAuth, signOut } from "firebase/auth";
+import { Ionicons } from "@expo/vector-icons";
+import LogoAseo from "../screens/LogoAseo";
+import { Image } from "react-native";
+
+const HomeScreen = ({ navigation }: any) => {
+  const [requests, setRequests] = useState<any[]>([]);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newAddress, setNewAddress] = useState("");
+  const [newRequesterName, setNewRequesterName] = useState("");
+  const [newPhoneNumber, setNewPhoneNumber] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<any>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isWorkingMode, setIsWorkingMode] = useState(false);
+  const [incompleteReason, setIncompleteReason] = useState("");
+  const [buttonsState, setButtonsState] = useState<{ [key: string]: string }>({});
+
+  const fetchRequests = async () => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const querySnapshot = await getDocs(collection(db, "requests"));
+      const fetchedRequests = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as any)
+      }));
+
+      // Filtrado según modo trabajar o no
+      const filtered = fetchedRequests.filter(req => {
+        if (isWorkingMode) {
+          // Mostrar solo solicitudes no creadas por el usuario
+          // y que estén pendientes o que el trabajador asignado sea el usuario actual
+          return req.userId !== user.uid && (req.status === "pendiente" || req.workerId === user.uid);
+        } else {
+          // Mostrar solicitudes creadas por el usuario y que no estén finalizadas
+          return req.userId === user.uid && req.status !== "finalizado";
+        }
+      });
+
+      setRequests(filtered);
+
+      // Guardar estados para los botones
+      const states: { [key: string]: string } = {};
+      filtered.forEach(req => {
+        states[req.id] = req.status;
+      });
+      setButtonsState(states);
+    } catch (error) {
+      Alert.alert("Error", "No se pudo cargar las solicitudes.");
+    }
+  };
+
+  useEffect(() => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (user) setUserId(user.uid);
+    fetchRequests();
+  }, [isWorkingMode]);
+
+  const updateRequestStatus = async (id: string, newStatus: string, extraData = {}) => {
+    const requestRef = doc(db, "requests", id);
+    await updateDoc(requestRef, { status: newStatus, ...extraData });
+    fetchRequests();
+  };
+
+  const handleStatusAdvance = async (id: string, status: string) => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const currentRequest = requests.find(req => req.id === id);
+    if (!currentRequest) return;
+
+    // Validaciones:
+    if (currentRequest.userId === user.uid) {
+      Alert.alert("Acción no permitida", "No puedes modificar tu propia solicitud.");
+      return;
+    }
+
+    if (currentRequest.workerId && currentRequest.workerId !== user.uid) {
+      Alert.alert("Acción no permitida", "Esta solicitud ya fue asignada a otro trabajador.");
+      return;
+    }
+
+    if (status === "pendiente") {
+      // Al aceptar, se asigna el workerId al usuario actual
+      await updateRequestStatus(id, "aceptado", { workerId: user.uid });
+    } else if (status === "aceptado") {
+      await updateRequestStatus(id, "en camino");
+      // Luego de 1 minuto se cambia a "en sitio"
+      setTimeout(async () => {
+        // Verificar que la solicitud sigue asignada al mismo trabajador antes de actualizar
+        const docSnap = await getDoc(doc(db, "requests", id));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.workerId === user.uid && data.status === "en camino") {
+            await updateRequestStatus(id, "en sitio");
+          }
+        }
+        fetchRequests();
+      }, 60000);
+    }
+  };
+
+  const handleFinalize = async (id: string) => {
+    try {
+      const requestRef = doc(db, "requests", id);
+      const requestSnap = await getDoc(requestRef);
+
+      if (!requestSnap.exists()) {
+        Alert.alert("Error", "La solicitud no existe.");
+        return;
+      }
+
+      const requestData = requestSnap.data();
+
+      // Guardar en colección de completadas
+      await addDoc(collection(db, "completedRequests"), {
+        ...requestData,
+        completedAt: new Date(),
+      });
+
+      // Eliminar de la colección actual
+      await deleteDoc(requestRef);
+
+      fetchRequests();
+      Alert.alert("Finalizado", "Solicitud marcada como finalizada.");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo finalizar la solicitud.");
+    }
+  };
+
+  const handleIncomplete = async (id: string) => {
+    if (!incompleteReason.trim()) {
+      Alert.alert("Error", "Debes escribir el motivo de la incompletitud.");
+      return;
+    }
+
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const currentRequest = requests.find(req => req.id === id);
+    if (!currentRequest) return;
+
+    if (currentRequest.userId === user.uid) {
+      Alert.alert("Acción no permitida", "No puedes modificar tu propia solicitud.");
+      return;
+    }
+
+    // Volver a "pendiente" y quitar asignación de trabajador
+    await updateRequestStatus(id, "pendiente", {
+      reason: incompleteReason,
+      workerId: null
+    });
+    setIncompleteReason("");
+  };
+
+  const handleLogout = async () => {
+    try {
+      const auth = getAuth();
+      await signOut(auth);
+      Alert.alert("Sesión cerrada", "Has cerrado sesión correctamente.");
+      navigation.navigate("Login");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo cerrar sesión.");
+    }
+  };
+
+  const handleCreateRequest = async () => {
+    if (!newTitle || !newDescription || !newPrice || !newAddress || !newRequesterName || !newPhoneNumber) {
+      Alert.alert("Error", "Todos los campos son obligatorios.");
+      return;
+    }
+
+    const priceValue = parseFloat(newPrice);
+    if (isNaN(priceValue) || priceValue <= 0) {
+      Alert.alert("Error", "El precio debe ser un número válido.");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "requests"), {
+        title: newTitle,
+        description: newDescription,
+        price: priceValue,
+        address: newAddress,
+        requesterName: newRequesterName,
+        phoneNumber: newPhoneNumber,
+        userId,
+        status: "pendiente",
+        workerId: null,
+        reason: null,
+      });
+
+      fetchRequests();
+      setModalVisible(false);
+      setNewTitle("");
+      setNewDescription("");
+      setNewPrice("");
+      setNewAddress("");
+      setNewRequesterName("");
+      setNewPhoneNumber("");
+      Alert.alert("Éxito", "Solicitud creada correctamente.");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo crear la solicitud.");
+    }
+  };
+
+  const handleDeleteRequest = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "requests", id));
+      fetchRequests();
+      Alert.alert("Éxito", "Solicitud eliminada correctamente.");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo eliminar la solicitud.");
+    }
+  };
+
+  const handleEditRequest = async () => {
+    if (!editingRequest) return;
+
+    const priceValue = parseFloat(newPrice);
+    if (isNaN(priceValue) || priceValue <= 0) {
+      Alert.alert("Error", "El precio debe ser un número válido.");
+      return;
+    }
+
+    try {
+      const requestRef = doc(db, "requests", editingRequest.id);
+      await updateDoc(requestRef, {
+        title: newTitle,
+        description: newDescription,
+        price: priceValue,
+        address: newAddress,
+        requesterName: newRequesterName,
+        phoneNumber: newPhoneNumber,
+      });
+
+      fetchRequests();
+      setModalVisible(false);
+      setEditingRequest(null);
+      setNewTitle("");
+      setNewDescription("");
+      setNewPrice("");
+      setNewAddress("");
+      setNewRequesterName("");
+      setNewPhoneNumber("");
+      Alert.alert("Éxito", "Solicitud actualizada correctamente.");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo actualizar la solicitud.");
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      
+      <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
+        <Ionicons name="menu" size={28} color="white" />
+      </TouchableOpacity>
+      
+      <Text style={styles.title}>Solicitudes</Text>
+      <Button title="Actualizar" onPress={fetchRequests} />
+      
+      <FlatList
+        data={requests}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.requestItem}>
+            <Text style={styles.requestTitle}>{item.title}</Text>
+            <Text>{item.description}</Text>
+            <Text>Precio: ${item.price} COP</Text>
+            <Text>Dirección: {item.address}</Text>
+            <Text>Solicitante: {item.requesterName}</Text>
+            <Text>Teléfono: {item.phoneNumber}</Text>
+            <Text>Estado: {item.status}</Text>
+            {item.reason && <Text>Motivo Incompleto: {item.reason}</Text>}
+
+            {/* Solo mostrar editar/eliminar si no está en modo trabajar y es del usuario */}
+            {!isWorkingMode && item.userId === userId && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => {
+                    setEditingRequest(item);
+                    setNewTitle(item.title);
+                    setNewDescription(item.description);
+                    setNewPrice(item.price.toString());
+                    setNewAddress(item.address || "");
+                    setNewRequesterName(item.requesterName || "");
+                    setNewPhoneNumber(item.phoneNumber || "");
+                    setModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.buttonText}>Editar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRequest(item.id)}>
+                  <Text style={styles.buttonText}>Eliminar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Mostrar botones de avance solo en modo trabajar y si no es el creador */}
+            {isWorkingMode && item.userId !== userId && (
+              <View style={{ marginTop: 10 }}>
+                {buttonsState[item.id] === "pendiente" && (
+                  <Button title="Aceptar" onPress={() => handleStatusAdvance(item.id, "pendiente")} />
+                )}
+                {buttonsState[item.id] === "aceptado" && (
+                  <Button title="En camino" onPress={() => handleStatusAdvance(item.id, "aceptado")} />
+                )}
+                {buttonsState[item.id] === "en camino" && (
+                  <Text>Esperando 1 minuto para habilitar "En sitio"...</Text>
+                )}
+                {buttonsState[item.id] === "en sitio" && (
+                  <View>
+                    <Button title="Finalizado" onPress={() => handleFinalize(item.id)} />
+                    <TextInput
+                      placeholder="Motivo si no se completó"
+                      style={styles.input}
+                      value={incompleteReason}
+                      onChangeText={setIncompleteReason}
+                    />
+                    <Button title="Incompleto" color="orange" onPress={() => handleIncomplete(item.id)} />
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+      />
+
+      {/* Botón para crear solicitud solo si NO está en modo trabajar */}
+      {!isWorkingMode && (
+        <Button
+          title="Crear Solicitud"
+          onPress={() => {
+            setEditingRequest(null);
+            setNewTitle("");
+            setNewDescription("");
+            setNewPrice("");
+            setNewAddress("");
+            setNewRequesterName("");
+            setNewPhoneNumber("");
+            setModalVisible(true);
+          }}
+        />
+      )}
+
+      {/* Cambiar modo de trabajo */}
+      <Button
+        title={isWorkingMode ? "Salir modo Trabajar" : "Entrar modo Trabajar"}
+        onPress={() => setIsWorkingMode(!isWorkingMode)}
+      />
+      
+      <Button title="Cerrar sesión" onPress={handleLogout} />
+
+      {/* Modal Crear/Editar */}
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{editingRequest ? "Editar Solicitud" : "Nueva Solicitud"}</Text>
+            <TextInput placeholder="Título" style={styles.input} value={newTitle} onChangeText={setNewTitle} />
+            <TextInput
+              placeholder="Descripción"
+              style={styles.input}
+              value={newDescription}
+              onChangeText={setNewDescription}
+              multiline
+            />
+            <TextInput
+              placeholder="Precio"
+              style={styles.input}
+              value={newPrice}
+              onChangeText={setNewPrice}
+              keyboardType="numeric"
+            />
+            <TextInput placeholder="Dirección" style={styles.input} value={newAddress} onChangeText={setNewAddress} />
+            <TextInput
+              placeholder="Nombre solicitante"
+              style={styles.input}
+              value={newRequesterName}
+              onChangeText={setNewRequesterName}
+            />
+            <TextInput
+              placeholder="Teléfono"
+              style={styles.input}
+              value={newPhoneNumber}
+              onChangeText={setNewPhoneNumber}
+              keyboardType="phone-pad"
+            />
+
+            <View style={{ flexDirection: "row", justifyContent: "space-around", marginTop: 10 }}>
+              <Button
+                title="Cancelar"
+                onPress={() => {
+                  setModalVisible(false);
+                  setEditingRequest(null);
+                }}
+                color="gray"
+              />
+              <Button
+                title={editingRequest ? "Actualizar" : "Crear"}
+                onPress={editingRequest ? handleEditRequest : handleCreateRequest}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    width: "100%",
+    padding: 20,
+    // Puedes agregar aquí estilos para que el contenido sea legible sobre el logo
+  },
+  backgroundImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    opacity: 0.08,
+    zIndex: -1,  // Esto asegura que esté detrás del resto
+    resizeMode: "contain",  // Esto depende si LogoAseo acepta style prop para Image
+  },
+  background: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#e0f2f1", // fondo verde claro
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#2e7d32",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  requestItem: {
+    borderWidth: 1,
+    borderColor: "#9E9E9E",
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 8,
+    backgroundColor: "#E8F5E9",
+  },
+  requestTitle: {
+    fontWeight: "bold",
+    fontSize: 18,
+    marginBottom: 4,
+    color: "#2E7D32",
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    marginTop: 10,
+    justifyContent: "space-around",
+  },
+  editButton: {
+    backgroundColor: "#4CAF50", // Verde
+    padding: 8,
+    borderRadius: 5,
+    width: 100,
+    alignItems: "center",
+  },
+  deleteButton: {
+    backgroundColor: "#9E9E9E", // Gris
+    padding: 8,
+    borderRadius: 5,
+    width: 100,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#BDBDBD", // Gris claro
+    borderRadius: 5,
+    padding: 8,
+    marginVertical: 5,
+    minHeight: 40,
+    backgroundColor: "#ffffff",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#388E3C",
+  },
+  menuButton: {
+    position: "absolute",
+    top: 40,
+    left: 20,
+    zIndex: 10,
+    backgroundColor: "#388E3C",
+    padding: 6,
+    borderRadius: 5,
+  },
 });
 
 export default HomeScreen;
