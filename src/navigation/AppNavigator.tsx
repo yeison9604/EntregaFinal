@@ -44,6 +44,7 @@ import RequestDetailScreen from "../screens/RequestDetailScreen";
 import CreatedRequestsScreen from "../screens/CreatedRequestsScreen";
 import CreateRequestScreen from "../screens/CreateRequestsScreen";
 import HomeScreen from '../screens/HomeScreen';
+import CompletedRequestsScreen from "../screens/CompletedRequestsScreen";
 
 export type RootStackParamList = {
   Home: undefined;
@@ -64,6 +65,7 @@ const AppNavigator = () => {
         <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
         <Stack.Screen name="CreatedRequests" component={CreatedRequestsScreen} />
         <Stack.Screen name="CreateRequest" component={CreateRequestScreen} />
+        <Stack.Screen name="CompletedRequests" component={CompletedRequestsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

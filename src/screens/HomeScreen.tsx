@@ -3188,9 +3188,9 @@ const HomeScreen = ({ navigation }: any) => {
   };
 
   const handleFinalize = async (id: string) => {
-    await deleteDoc(doc(db, "requests", id));
+    await updateRequestStatus(id, "finalizado");
     fetchRequests();
-    Alert.alert("Finalizado", "Solicitud finalizada y eliminada.");
+    Alert.alert("Finalizado", "Solicitud marcada como finalizada.");
   };
 
   const handleIncomplete = async (id: string) => {
@@ -3412,6 +3412,7 @@ const HomeScreen = ({ navigation }: any) => {
             <Button title="Información de la app" onPress={() => { setMenuVisible(false); Alert.alert("Info", "App creada por ti 😄"); }} />
             <Button title="Trabajar" onPress={() => { setMenuVisible(false); setIsWorkingMode(true); }} />
             <Button title="Dejar de trabajar" onPress={() => { setMenuVisible(false); setIsWorkingMode(false); }} />
+            <Button title="Solicitudes Completadas" onPress={() => {setMenuVisible(false); navigation.navigate("CompletedRequests"); }} />
             <Button title="Cerrar Sesión" color="red" onPress={handleLogout} />
           </View>
         </TouchableOpacity>
