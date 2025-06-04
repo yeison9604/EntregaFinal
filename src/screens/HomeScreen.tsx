@@ -3460,8 +3460,7 @@ import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, getDoc } from "
 import { db } from "../config/firebaseConfig";
 import { getAuth, signOut } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
-import LogoAseo from "../screens/LogoAseo";
-import { Image } from "react-native";
+
 
 const HomeScreen = ({ navigation }: any) => {
   const [requests, setRequests] = useState<any[]>([]);
@@ -3724,7 +3723,33 @@ const HomeScreen = ({ navigation }: any) => {
       <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
         <Ionicons name="menu" size={28} color="white" />
       </TouchableOpacity>
-      
+      {menuVisible && (
+  <TouchableOpacity
+    style={styles.menuOverlay}
+    activeOpacity={1}
+    onPress={() => setMenuVisible(false)}
+  >
+    <View style={styles.menuContainer}>
+      <Text style={styles.menuTitle}>Menú</Text>
+
+      <Button
+        title={isWorkingMode ? "Salir modo Trabajar" : "Entrar modo Trabajar"}
+        onPress={() => {
+          setIsWorkingMode(!isWorkingMode);
+          setMenuVisible(false);
+        }}
+      />
+
+      <Button
+        title="Cerrar sesión"
+        onPress={() => {
+          handleLogout();
+          setMenuVisible(false);
+        }}
+      />
+    </View>
+  </TouchableOpacity>
+)}
       <Text style={styles.title}>Solicitudes</Text>
       <Button title="Actualizar" onPress={fetchRequests} />
       
@@ -3814,10 +3839,10 @@ const HomeScreen = ({ navigation }: any) => {
       )}
 
       {/* Cambiar modo de trabajo */}
-      <Button
+      {/*<Button
         title={isWorkingMode ? "Salir modo Trabajar" : "Entrar modo Trabajar"}
         onPress={() => setIsWorkingMode(!isWorkingMode)}
-      />
+      />*/}
       
       <Button title="Cerrar sesión" onPress={handleLogout} />
 
@@ -3884,6 +3909,30 @@ const styles = StyleSheet.create({
     padding: 20,
     // Puedes agregar aquí estilos para que el contenido sea legible sobre el logo
   },
+  menuOverlay: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  justifyContent: "flex-start",
+  alignItems: "flex-start",
+  zIndex: 1000,
+},
+menuContainer: {
+  width: 250,
+  backgroundColor: "white",
+  padding: 20,
+  elevation: 10,
+  borderTopRightRadius: 10,
+  borderBottomRightRadius: 10,
+},
+menuTitle: {
+  fontSize: 20,
+  fontWeight: "bold",
+  marginBottom: 20,
+},
   backgroundImage: {
     position: "absolute",
     top: 0,

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, Modal } from "react-native";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { db } from "../config/firebaseConfig";
+import { getAuth } from "firebase/auth";
 
 const RequestsScreen = () => {
   const [requests, setRequests] = useState<any[]>([]);
@@ -10,6 +11,9 @@ const RequestsScreen = () => {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [incompleteReason, setIncompleteReason] = useState("");
 
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
+
   const fetchRequests = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "requests"));
@@ -17,7 +21,10 @@ const RequestsScreen = () => {
         id: doc.id,
         ...(doc.data() as any),
       }));
-      setRequests(fetched);
+
+      // Filtra solicitudes que NO fueron creadas por el usuario actual
+      const filtered = fetched.filter((req) => req.userId !== currentUser?.uid);
+      setRequests(filtered);
     } catch (error) {
       Alert.alert("Error", "No se pudieron cargar las solicitudes.");
     }
@@ -29,6 +36,14 @@ const RequestsScreen = () => {
 
   const updateRequestStatus = async (id: string, status: string, reason?: string) => {
     try {
+      const request = requests.find((req) => req.id === id);
+
+      // Verifica que el usuario no sea el creador
+      if (request?.userId === currentUser?.uid) {
+        Alert.alert("Acción no permitida", "No puedes cambiar el estado de tu propia solicitud.");
+        return;
+      }
+
       const requestRef = doc(db, "requests", id);
       const updateData: any = { status };
       if (reason) updateData.incompleteReason = reason;
@@ -40,18 +55,14 @@ const RequestsScreen = () => {
   };
 
   const handleFinalizar = async (id: string) => {
-    try {
-      await updateRequestStatus(id, "finalizado");
-    } catch (error) {
-      Alert.alert("Error", "No se pudo finalizar la solicitud.");
-    }
+    await updateRequestStatus(id, "finalizado");
   };
 
   const handleEnCamino = (id: string) => {
     updateRequestStatus(id, "en camino");
     setTimeout(() => {
       setEnSitioEnabled((prev) => ({ ...prev, [id]: true }));
-    }, 60000); // 1 minuto
+    }, 60000);
   };
 
   const openIncompleteModal = (id: string) => {
@@ -139,7 +150,6 @@ const RequestsScreen = () => {
         ListEmptyComponent={<Text>No hay solicitudes disponibles.</Text>}
       />
 
-      {/* Modal de motivo de incompleto */}
       <Modal visible={reasonModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>

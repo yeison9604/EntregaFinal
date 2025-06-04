@@ -25,7 +25,7 @@ const App = () => {
   import LoginScreen from "./src/screens/LoginScreen";
   import RegisterScreen from "./src/screens/RegisterScreen";
   import HomeScreen from "./src/screens/HomeScreen";
-  import RequestsScreen from "./src/screens/RequestsScreen"; // 👈 Asegúrate de importar esta pantalla
+  import RequestsScreen from "./src/screens/RequestsScreen"; 
   import ProfileScreen from "./src/screens/ProfileScreen";
 import AboutScreen from "./src/screens/AboutScreen";
   import { initializeApp } from "firebase/app";
