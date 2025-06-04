@@ -27,7 +27,9 @@ const App = () => {
   import HomeScreen from "./src/screens/HomeScreen";
   import RequestsScreen from "./src/screens/RequestsScreen"; 
   import ProfileScreen from "./src/screens/ProfileScreen";
-import AboutScreen from "./src/screens/AboutScreen";
+  import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
+  import CheckEmailScreen from "./src/screens/CheckEmailScreen";
+  import AboutScreen from "./src/screens/AboutScreen";
   import { initializeApp } from "firebase/app";
   import { firebaseConfig } from "./src/config/firebaseConfig";
   import { AppRegistry } from "react-native";
@@ -66,11 +68,14 @@ import AboutScreen from "./src/screens/AboutScreen";
               <Stack.Screen name="RequestsScreen" component={RequestsScreen} />
               <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
               <Stack.Screen name="AboutScreen" component={AboutScreen} />
+              
             </>
           ) : (
             <>
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="Register" component={RegisterScreen} />
+              <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+              <Stack.Screen name="CheckEmail" component={CheckEmailScreen} />
             </>
           )}
         </Stack.Navigator>
